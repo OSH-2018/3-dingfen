@@ -3,7 +3,7 @@
 ## 文件系统结构
 
 ```c
-# define MAX_FILENUM 512		//最多的文件数量
+# define MAX_FILENUM 1024		//最多的文件数量
 # define BLOCKS_INODE 50		//inode中可以存放的block号码数
 # define BLOCK_SIZE 4096		//一个块的大小
 # define INODE_SIZE 512			//一个inode的大小
@@ -69,12 +69,12 @@ static void *mem[BLOCKNUM];
 static inode *root;
 static SuperBlock *super;
  
-int inode_bitmap[INODENUM / 32];        //inode bitmap inode位视图
+int *inode_bitmap;        //inode bitmap inode位视图
 
-int block_bitmap[BLOCKNUM / 32];
+int *block_bitmap;
 ```
 
-全局变量一览。数组mem存放的是block，数组node存放inode。bitmap表示block和bitmap的分配情况，0表示未分配，1表示分配。
+全局变量一览。数组mem存放的是block，数组node存放inode。bitmap表示block和bitmap的分配情况，0表示未分配，1表示分配。block_bitmap数组存放在mem[1]中，而inode_bitmap数组存放在mem[0]中。
 
 ## 文件系统基本情况
 
@@ -86,7 +86,7 @@ int block_bitmap[BLOCKNUM / 32];
 
 ### 版本2.0
 
-实现2.0版本的文件系统仍然参考了linux中的ext2文件系统结构。对版本1.0中的不足（尤其是文件大小过小）进行改进。源代码为os.c，现在的可执行文件oshfs是由它编译产生的。**（助教检查2.0版本吧。。。。）**文件名长度不能超过265个，最多支持512个文件数量，最大文件4M左右，block块大小为4KB，一共有32K个block，inode大小512Bytes，一共有512个inode。
+实现2.0版本的文件系统仍然参考了linux中的ext2文件系统结构。对版本1.0中的不足（尤其是文件大小过小）进行改进。源代码为os.c，现在的可执行文件oshfs是由它编译产生的。**（助教检查2.0版本吧。。。。）**文件名长度不能超过265个，最多支持1024个文件数量，最大文件4M，block块大小为4KB，一共有32K个block，inode大小512Bytes，一共有1024个inode。
 
 ## ****内存管理
 

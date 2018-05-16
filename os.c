@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 #include <inttypes.h>
 
-#define MAX_FILENUM 512
+#define MAX_FILENUM 1024
 #define BLOCKS_INODE 50
 #define BLOCK_SIZE 4096
 #define INODE_SIZE 512
@@ -60,9 +60,9 @@ static void *mem[BLOCKNUM];
 static inode *root;
 static SuperBlock *super;
 
-int inode_bitmap[INODENUM / 32];	    //inode bitmap inode位图
+int32_t *inode_bitmap;	    //inode bitmap inode位图
 
-int block_bitmap[BLOCKNUM / 32];		//block bitmap block位图
+int32_t *block_bitmap;		//block bitmap block位图
 
 
 //分配inode给文件
@@ -215,8 +215,11 @@ static void *oshfs_init(struct fuse_conn_info *conn)
     int i;
 
     mem[0] = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    mem[1] = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	node[0] = mmap(NULL,INODE_SIZE,PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
+    block_bitmap = (int *)mem[1];
+    inode_bitmap = (int *)(mem[0]+1024);
     memset(inode_bitmap,0,INODENUM / 32 * sizeof(int));
     memset(block_bitmap,0,BLOCKNUM / 32 * sizeof(int));
     //superblock的初始化以及root的初始化
@@ -245,8 +248,9 @@ static void *oshfs_init(struct fuse_conn_info *conn)
     root->st->st_blocks = 0;
     root->st->st_size = 0;
 
-    block_bitmap[0] = 1;
+    block_bitmap[0] = 3;
     inode_bitmap[0] = 1;
+    printf("%d %d\n",block_bitmap[2],inode_bitmap[10]);
     return NULL;
 }
 
@@ -324,8 +328,8 @@ static int oshfs_open(const char *path, struct fuse_file_info *fi)
 static int oshfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int i,j,k,n;
-    int off,newoff,min;
-    int *p;
+    ssize_t off,newoff,min;
+    int32_t *p;
     struct inode *node = get_inode(path);
     
     node->st->st_size = offset + size;          // 计算文件的新的大小
@@ -446,7 +450,7 @@ static int oshfs_truncate(const char *path, off_t size)
             memcpy(mem[k],buf,size % BLOCK_SIZE);
         }
         else {
-            int *p = (int *)mem[node->bindirect];
+            int32_t *p = (int32_t *)mem[node->bindirect];
             m = *(p + j - BLOCKS_INODE);
             memcpy(buf,mem[m],size % BLOCK_SIZE);
             //从第j个块开始，把后面的块释放掉
@@ -467,8 +471,9 @@ static int oshfs_truncate(const char *path, off_t size)
 static int oshfs_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int i = 0;
-    int j,m,n,k,off,min;
-    int *p;
+    int j,m,n,k;
+    ssize_t off,min;
+    int32_t *p;
     struct inode *node = get_inode(path);
     int ret = size;
 

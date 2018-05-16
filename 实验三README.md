@@ -15,7 +15,7 @@
 ```c
 //超级块SuperBlock起始地址为0,其结构如下`
 `typedef struct {`
-    int blocksize;              //block大小   4KB
+    int blocksize;              //block大小 4KB
     int inodesize;              //inode大小 2KB
     int sum_inodes;             //inode的总数
 	int free_inodes;            //空闲inode的总数
@@ -60,7 +60,7 @@ typedef struct inode{
 
 inode结构体，存放了文件名（filename），间接索引block号码，该block存放了inode中放不下的block号码。struct filestate结构体，存储着文件的信息，以及指向下一个inode的指针。
 
-block块没有定义结构体，因为整个block块中全部存放了数据，不需要定义什么结构体。
+block块没有定义结构体，因为整个block块中全部存放了数据，不需要定义什么结构体。全部存放数据的好处是方便数据的对齐，对一些设备会比较友好。
 
 ```c
 //block size 4KB block numbers 32K 
@@ -86,7 +86,7 @@ int block_bitmap[BLOCKNUM / 32];
 
 ### 版本2.0
 
-实现2.0版本的文件系统仍然参考了linux中的ext2文件系统结构。对版本1.0中的不足（尤其是文件大小过小）进行改进。源代码为os.c，现在的可执行文件oshfs是由它编译产生的。**（助教检查2.0版本吧。。。。）**
+实现2.0版本的文件系统仍然参考了linux中的ext2文件系统结构。对版本1.0中的不足（尤其是文件大小过小）进行改进。源代码为os.c，现在的可执行文件oshfs是由它编译产生的。**（助教检查2.0版本吧。。。。）**文件名长度不能超过265个，最多支持512个文件数量，最大文件4M左右，block块大小为4KB，一共有32K个block，inode大小512Bytes，一共有512个inode。
 
 ## ****内存管理
 
@@ -105,6 +105,6 @@ int block_bitmap[BLOCKNUM / 32];
 
 由于电脑内存不太充足以及算法设计问题，最大文件数量和最大文件不是很令人满意，不过如果要增加，可以修改几个常数进行扩展。
 
-比如，修改BLOCKSIZE和BLOCKNUM增加块数的数量以及大小，修改INODENUM和INODESIZE增加单个文件的大小，注意大小最好是2的幂次。
+修改BLOCKSIZE和BLOCKNUM增加块数的数量以及大小，修改INODENUM和INODESIZE增加单个文件的大小，注意大小最好是2的幂次。
 
-例如：将BLOCKSIZE的大小设为32KB时，文件大小可以扩展为32KB（50+8*1024），约为256MB。
+例如：将BLOCKSIZE的大小设为32KB时，文件大小可以扩展为32KB（50+8*1024），约为256MB。也可以进一步实现二级间接索引，直接把文件大小扩展为4GB左右，但二级索引比较复杂，能力时间有限，未能实现。。。。

@@ -3,6 +3,16 @@
 ## 文件系统结构
 
 ```c
+# define MAX_FILENUM 512		//最多的文件数量
+# define BLOCKS_INODE 50		//inode中可以存放的block号码数
+# define BLOCK_SIZE 4096		//一个块的大小
+# define INODE_SIZE 512			//一个inode的大小
+# define BLOCKNUM 32*1024		//总共的block数目
+# define INODENUM 1024			//总共的inode数目
+# define MAX_FILENAME 256		//最长的文件名长度
+```
+
+```c
 //超级块SuperBlock起始地址为0,其结构如下`
 `typedef struct {`
     int blocksize;              //block大小   4KB
@@ -16,7 +26,7 @@
 `}SuperBlock;`
 ```
 
-超级块放在mem[0]处，存储以上内容。
+超级块放在mem[0]处，存储以上内容。记录文件系统的基本信息。
 
 ```c
 //struct filestate是struct stat的缩量版
@@ -35,23 +45,22 @@ struct filestate {
 };
 ```
 
-为了节省inode空间，这里只取了struct stat结构体中需要的项。 
+为了节省inode空间，这里只取了struct stat结构体中需要的项。有inode号码，文件权限，用户ID，用户组ID，整个文件的大小，文件块大小以及块数目。 
 
 ```c
 //inode 存储，权限，文件大小，分配给的block块等
-typedef struct inode {
-    char filename[128];
-    void *pointer[MAX_FILE_BLOCK];
-    struct link{
-        int blocknr;                //block块的链表
-        struct link *next;
-    }*blocklink;
+typedef struct inode{
+    char filename[MAX_FILENAME];
+    int  blnum[BLOCKS_INODE];
+    int bindirect;              //间接索引，把block号码放在一个新的block块中
     struct filestate *st;
     struct inode *next;
-}inode; 
+}inode;
 ```
 
-inode结构体，存放了文件名（filename），指向文件中的block指针数组(pointer)，block的链表，struct filestate结构体，存储着文件的信息，以及指向下一个inode的指针。
+inode结构体，存放了文件名（filename），间接索引block号码，该block存放了inode中放不下的block号码。struct filestate结构体，存储着文件的信息，以及指向下一个inode的指针。
+
+block块没有定义结构体，因为整个block块中全部存放了数据，不需要定义什么结构体。
 
 ```c
 //block size 4KB block numbers 32K 
@@ -69,25 +78,33 @@ int block_bitmap[BLOCKNUM / 32];
 
 ## 文件系统基本情况
 
+### 版本1.0
+
 实现的文件系统大体上参考了linux中ext2文件系统的结构。我按自己的想法对read、write、readdir、getattr、truncate、init、create等函数进行简单的实现，源代码为oshfs.c。
 
-由于电脑原因，该文件系统总大小只有130M左右，无法支持特别大的文件。。。除此之外，规定文件名不得超过128个字节，最多支持512个文件，最大文件为2M。
+由于电脑内存空间不足，我设计的该文件系统总大小只有130M左右，无法支持特别大的文件。。。除此之外，规定文件名不得超过128个字节，最多支持512个文件，最大文件为2M左右。
 
-## 内存管理
+### 版本2.0
 
-总文件系统大小为130M左右。其中包含了32k个大小为4k的数据块，和512个大小为2k的inode，还有一部分全局变量以及bitmap。在ext2中，文件inode实现了多级索引，即inode可以指向另一个inode，然后在索引相应的block。但是由于时间和能力有限，我只实现了直接索引，这也是单个文件大小被限制的主要原因。。。。
+实现2.0版本的文件系统仍然参考了linux中的ext2文件系统结构。对版本1.0中的不足（尤其是文件大小过小）进行改进。源代码为os.c，现在的可执行文件oshfs是由它编译产生的。**（助教检查2.0版本吧。。。。）**
+
+## ****内存管理
+
+总文件系统大小为130M左右。其中包含了32k个大小为4k的数据块，和512个大小为512Bytes的inode，还有一部分全局变量以及bitmap。在ext2中，文件inode实现了多级索引，即inode可以指向另一个inode，然后在索引相应的block（如下图）。但是由于时间和能力有限，我只实现了直接索引和一级间接索引。
 
 内存分配过程如下：
 	1、首先创建一个文件，分配一个inode。分配时根据bitmap数组中的数据，找到一个未分配的inode，并写入文件的信息。
 
-​	2、分配block。也是根据bitmap数组中的数据，找到一个未分配的inode，分配给该文件，把block编号给inode，在inode里面组成一个block链表。这样做的目的是，防止无序的block编号影响的文件的读写操作。
+​	2、写操作时分配block。也是根据bitmap数组中的数据，找到一个未分配的inode，分配给该文件，把block编号给inode，然后放在inode的blnum这个数组中。而数组只有50个元素，当分配的块多于50个时，就要分配一个block，把号码给bindirect，这个块就是记录block号码的新空间，这个block可以记录1024个块号码。因此，一个文件最大有4KB*（1024+50），相当于4M左右。
 
-对于内存的回收，首先将block回收，再把inode回收。
+对于内存的回收，首先将block回收，如果block有超过50个，还要回收bindirect记录的block号码，再把inode回收。
 
 ![img](http://docs.linuxtone.org/ebooks/C&CPP/c/images/fs.datablockaddr.png)
 
 ## 扩展性
 
-由于设备原因，最大文件数量和最大文件不是很令人满意，可以修改几个常数进行扩展。
+由于电脑内存不太充足以及算法设计问题，最大文件数量和最大文件不是很令人满意，不过如果要增加，可以修改几个常数进行扩展。
 
 比如，修改BLOCKSIZE和BLOCKNUM增加块数的数量以及大小，修改INODENUM和INODESIZE增加单个文件的大小，注意大小最好是2的幂次。
+
+例如：将BLOCKSIZE的大小设为32KB时，文件大小可以扩展为32KB（50+8*1024），约为256MB。
